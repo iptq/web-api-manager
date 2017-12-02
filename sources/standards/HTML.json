@@ -189,7 +189,6 @@
     "window.onvolumechange",
     "window.onwaiting",
     "window.onwheel",
-    "window.open",
     "window.opener",
     "window.parent",
     "window.self",

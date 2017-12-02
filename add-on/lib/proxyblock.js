@@ -32,7 +32,7 @@
         const removeChild = window.Element.prototype.removeChild;
         const getElementsByTagName = window.document.getElementsByTagName;
 
-        const defaultFunction = function () {};
+        const defaultFunction = function () { };
         const funcPropNames = Object.getOwnPropertyNames(defaultFunction);
         const unconfigurablePropNames = funcPropNames.filter(function (propName) {
             const possiblePropDesc = Object.getOwnPropertyDescriptor(defaultFunction, propName);
@@ -66,7 +66,7 @@
             return undefined;
         };
 
-        const keyPathToRefPath = function (keyPath) {
+        const keyPathToRefPath = function (keyPath, target) {
             const keyParts = keyPath.split(".");
             return keyParts.reduce(function (prev, cur) {
 
@@ -76,7 +76,7 @@
 
                 const numNodes = prev.length;
                 const currentLeaf = (numNodes === 0)
-                    ? window
+                    ? target
                     : prev[numNodes - 1];
                 const nextLeaf = currentLeaf[cur];
 
@@ -95,8 +95,8 @@
             const logKeyPath = function () {
 
                 if (keyPath !== undefined &&
-                        hasBeenLogged === false &&
-                        shouldLog) {
+                    hasBeenLogged === false &&
+                    shouldLog) {
                     hasBeenLogged = true;
                     const standard = featureToStandardMapping[keyPath];
                     const message = `Blocked '${keyPath}' from '${standard}' on '${hostName}'`;
@@ -157,8 +157,10 @@
 
         const defaultBlockingProxy = createBlockingProxy();
 
-        const blockFeatureAtKeyPath = function (keyPath) {
-            const propertyRefs = keyPathToRefPath(keyPath);
+        const blockFeatureAtKeyPath = function (keyPath, target) {
+            target = target || window;
+
+            const propertyRefs = keyPathToRefPath(keyPath, target);
 
             // If we weren't able to turn the key path into an array of references,
             // then it means that the property doesn't exist in this DOM /
@@ -197,7 +199,20 @@
             }
         };
 
-        featuresToBlock.forEach(blockFeatureAtKeyPath);
+        const oldWindowOpen = window.open;
+        const windowOpenProxy = new Proxy(window.open, {
+            apply: function (target, thisArg, argumentsList) {
+                console.log("window.open =", oldWindowOpen);
+                const wnd = oldWindowOpen.apply(thisArg, argumentsList);
+                featuresToBlock.forEach((v) => blockFeatureAtKeyPath(v, wnd));
+                return wnd;
+            }
+        });
+        Object.defineProperty(window, "open", {
+            get: () => windowOpenProxy
+        });
+
+        featuresToBlock.forEach((v) => blockFeatureAtKeyPath(v));
 
         // Next, delete the WEB_API_MANAGER_PAGE global property.  Technically
         // this never needed to be global, but doing so allows for easier
