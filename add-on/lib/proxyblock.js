@@ -199,19 +199,22 @@
             }
         };
 
-        const oldWindowOpen = window.open;
-        const windowOpenProxy = new Proxy(window.open, {
-            apply: function (target, thisArg, argumentsList) {
-                console.log("window.open =", oldWindowOpen);
-                const wnd = oldWindowOpen.apply(thisArg, argumentsList);
-                featuresToBlock.forEach((v) => blockFeatureAtKeyPath(v, wnd));
-                return wnd;
-            }
-        });
-        Object.defineProperty(window, "open", {
-            get: () => windowOpenProxy
-        });
+        const blockOpen = function(window){
+            const oldWindowOpen = window.open;
+            const windowOpenProxy = new Proxy(window.open, {
+                apply: function (target, thisArg, argumentsList) {
+                    const wnd = oldWindowOpen.apply(thisArg, argumentsList);
+                    blockOpen(wnd);
+                    featuresToBlock.forEach((v) => blockFeatureAtKeyPath(v, wnd));
+                    return wnd;
+                }
+            });
+            Object.defineProperty(window, "open", {
+                get: () => windowOpenProxy
+            });
+        }
 
+        blockOpen(window);
         featuresToBlock.forEach((v) => blockFeatureAtKeyPath(v));
 
         // Next, delete the WEB_API_MANAGER_PAGE global property.  Technically
